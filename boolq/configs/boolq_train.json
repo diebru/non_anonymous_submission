@@ -1,0 +1,10 @@
+{
+    "boolq-train": {
+        "test_path": "datasets/boolq/train.jsonl",
+        "language": "en",
+        "tasks": ["cot"],
+        "process_fn": "process_boolq_test",
+        "answer_extraction_fn": "extract_boolq_answer",
+        "eval_fn": "eval_boolq"
+    }
+}

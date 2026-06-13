@@ -1,0 +1,31 @@
+# Merge the Phase-4 LoRA adapter into the base model -> a standalone, plain HF
+# checkpoint, so the energy-instrumented test sweep runs on a single model (no
+# base+adapter) and the energy monitors measure a vanilla forward pass.
+#
+# Run in llamafactory_env on the server (never local, docs/WORKFLOW.md s2):
+#   llamafactory-cli export configs/llamafactory/qwen2.5-coder-3b_merge.yaml
+#
+# CORRECTNESS PINS (a wrong base silently corrupts the merge: merged = base + dLoRA):
+#   * model_name_or_path MUST be byte-identical to the base used for SFT in
+#     qwen2.5-coder-3b_lora.yaml (HF snapshot 488639f1ff808d1d3d0ba301aef8c11461451ec5).
+#   * NO quantization (export_quantization_bit unset) -- quantizing would confound
+#     the accuracy + energy axes (the whole reason we stay bf16/fp16).
+#   * infer_dtype bfloat16 == the SFT dtype and vLLM RunnerConfig.dtype.
+#
+# Edit the 3 machine paths below per server (same convention as the LoRA yaml).
+
+### model
+# Same base as qwen2.5-coder-3b_lora.yaml `model_name_or_path` (pinned snapshot 488639f1...).
+model_name_or_path: /data/models/Qwen2.5-Coder-3B-Instruct
+# = the LoRA yaml `output_dir` (the trained adapter).
+adapter_name_or_path: /data/tokenskip_mceval3/weights/qwen2.5-coder-3b-instruct/lora_sft_run01
+template: qwen            # MUST match the SFT template (qwen)
+finetuning_type: lora
+trust_remote_code: true
+infer_dtype: bfloat16     # match SFT (bf16) + vLLM dtype; do NOT let it downcast
+
+### export
+export_dir: /data/tokenskip_mceval3/weights/qwen2.5-coder-3b-instruct/merged_sft_run01
+export_size: 5            # shard size (GB); the 3B is ~6 GB bf16
+export_device: cpu        # merge on CPU -> leaves the A6000s free; choices: [cpu, auto]
+export_legacy_format: false  # safetensors

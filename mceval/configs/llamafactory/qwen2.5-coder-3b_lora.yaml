@@ -1,0 +1,65 @@
+# LoRA SFT config for Qwen2.5-Coder-3B-Instruct (TokenSkip x McEval, Phase 3).
+#
+# Adapted from the vendored TokenSkip 3B recipe
+# (TokenSkip/configs/examples/train_lora/myllama3_lora_sft_compressed_gsm8k_llmlingua2_qwen_3B.yaml):
+#   changed: model -> Qwen2.5-Coder-3B-Instruct, dataset -> our generation set,
+#            dataset_dir -> the gitignored sft/ output, cutoff_len (see note).
+#   kept:    lora_target all, rank 8 / alpha 16, template qwen, lr 5e-5, 3 epochs,
+#            bs1 x grad_accum 8, bf16, val_size 0.1.
+#
+# The ACTUAL SFT run is Phase 4, in llamafactory_env on the server (never local,
+# docs/WORKFLOW.md s2). Paths below are server placeholders -- edit per machine.
+# Build the dataset first:  python3 scripts/build_sft_dataset.py --model qwen2.5-coder-3b-instruct
+
+### model
+# Pin the HF commit (Decision #8) to the same Coder-3B used in Phase-1 inference.
+model_name_or_path: /data/models/Qwen2.5-Coder-3B-Instruct
+trust_remote_code: true
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_target: all          # all linear projections (TokenSkip default)
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.05
+
+### dataset
+# 'dataset' must match dataset_name() in build_sft_dataset.py; 'dataset_dir' is the
+# folder holding that script's dataset_info.json + generation_train.jsonl
+# (= <data_root>/sft/qwen2.5-coder-3b-instruct). Both gitignored, produced on the server.
+dataset: tsmc_qwen2.5-coder-3b-instruct_generation
+dataset_dir: /data/tokenskip_mceval3/sft/qwen2.5-coder-3b-instruct
+template: qwen            # MUST equal vLLM's apply_chat_template (Phase-3 gate)
+cutoff_len: 2048          # set from build_summary (--count-tokens): measured p100 =
+                          # 1333 Qwen tokens (rec >=1536); 2048 covers that + the
+                          # chat-template overhead with margin, so no gamma=1.0
+                          # full-CoT target is truncated (would lose sentinel+code).
+max_samples: 100000       # > the ~2,928 all-gamma examples -> keeps the whole set
+overwrite_cache: true
+preprocessing_num_workers: 16
+
+### output
+output_dir: /data/tokenskip_mceval3/weights/qwen2.5-coder-3b-instruct/lora_sft_run01
+logging_steps: 10
+save_steps: 300
+plot_loss: true
+overwrite_output_dir: true
+
+### train
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+optim: adamw_torch
+learning_rate: 5.0e-5
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+ddp_timeout: 180000000
+
+### eval
+val_size: 0.1
+per_device_eval_batch_size: 1
+eval_strategy: steps
+eval_steps: 300

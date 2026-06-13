@@ -1,0 +1,36 @@
+# Path configuration TEMPLATE for the TokenSkip x McEval project.
+#
+# Copy to configs/paths.yaml and edit per machine. configs/paths.yaml is
+# gitignored (machine-specific); this *.example.yaml is committed.
+#
+# Resolution rules (see src/tsmc/config.py):
+#   - relative paths are resolved against the auto-detected repo root
+#   - absolute paths are used as-is
+#   - environment variables override the file: TSMC_REPO_ROOT, TSMC_DATA_ROOT
+#   - leave a value blank / omit it to take the documented default
+#
+# GOLDEN RULE (docs/WORKFLOW.md): all execution is remote. On the server,
+# data_root points at a large disk; locally it can stay at the repo root for
+# CPU-only tests.
+
+paths:
+  # Root for bulk, gitignored artifacts (generations/, compressed/, sft/,
+  # weights/, eval_dumps/). Default: the repo root. On the server set this to a
+  # big disk, e.g. /data/tokenskip_mceval3.
+  data_root:
+
+  # Vendored McEval benchmark + harness. Default: <repo_root>/McEval
+  mceval_dir:
+  # Tracked benchmark .jsonl. Default: <mceval_dir>/data
+  mceval_data_dir:
+
+  # Split manifest (committed; the git exception).
+  # Default: <repo_root>/manifest/split_manifest.csv
+  manifest_path:
+
+  # Override individual artifact dirs only if they must live apart from data_root.
+  generations_dir:
+  compressed_dir:
+  sft_dir:
+  weights_dir:
+  eval_dumps_dir:

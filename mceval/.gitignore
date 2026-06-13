@@ -1,0 +1,37 @@
+# === Bulk artifacts: stay on the server, never in git ===
+# (See docs/WORKFLOW.md "Git artifact policy")
+generations/
+corpus/
+compressed/
+# Anchored to repo root: the SFT data dir lives at <data_root>/sft, but an
+# unanchored `sft/` would also ignore the src/tsmc/sft source package.
+/sft/
+weights/
+eval_dumps/
+
+# Bulk data files (model outputs, per-language results, compressed corpora).
+# NOTE: McEval benchmark *.jsonl under McEval/data/ are already tracked; this rule
+# only blocks NEW bulk .jsonl. The split manifest is .csv/.tsv on purpose so it is
+# NOT caught here.
+*.jsonl
+
+# === Secrets / local config ===
+.env
+.env.*
+*.local
+
+# Resolved (machine/run-specific) configs. The *.example.yaml templates ARE tracked.
+configs/paths.yaml
+configs/run_metadata.yaml
+
+# === Python build artifacts ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.ipynb_checkpoints/
+
+# === Editor / OS noise ===
+.vscode/
+.idea/
+.DS_Store

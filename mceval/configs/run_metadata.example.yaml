@@ -1,0 +1,75 @@
+# Pinned run-provenance metadata TEMPLATE (Phase-0 decision sheet #8).
+#
+# Copy to configs/run_metadata.yaml and fill in the EXACT pinned values for a
+# run, on the server, from the actually installed versions/digests. Every result
+# row must be reproducible from one frozen (manifest + this metadata) pair.
+# Hashing the prompt template detects contract drift in the DATA, not just in git.
+#
+# All "TBD-*" values below are placeholders to be filled at run time.
+
+run:
+  run_id: run01        # 1 run per (model x gamma x task) for now (Decision #7)
+  seed: 42             # Decision #7
+  temperature: 0.0     # greedy (vLLM greedy is not bitwise-deterministic)
+  top_p: 0.95
+
+models:
+  # HF model commit hashes (pin the commit, never a floating tag).
+  qwen2.5-3b-instruct:
+    hf_repo: Qwen/Qwen2.5-3B-Instruct
+    commit: TBD-COMMIT-SHA
+  qwen2.5-coder-3b-instruct:
+    hf_repo: Qwen/Qwen2.5-Coder-3B-Instruct
+    commit: TBD-COMMIT-SHA
+  qwen2.5-7b-instruct:
+    hf_repo: Qwen/Qwen2.5-7B-Instruct
+    commit: TBD-COMMIT-SHA
+  qwen2.5-14b-instruct:
+    hf_repo: Qwen/Qwen2.5-14B-Instruct
+    commit: TBD-COMMIT-SHA
+  qwen2.5-coder-7b-instruct:
+    hf_repo: Qwen/Qwen2.5-Coder-7B-Instruct
+    commit: TBD-COMMIT-SHA
+  qwen2.5-coder-14b-instruct:
+    hf_repo: Qwen/Qwen2.5-Coder-14B-Instruct
+    commit: TBD-COMMIT-SHA
+  # Cross-family robustness arm (2026-06-08). Uses the Llama-safe gamma marker
+  # (tsmc.contract.prompt GAMMA_DELIMITERS["llama3"]) + LlamaFactory template llama3.
+  llama-3.1-8b-instruct:
+    hf_repo: meta-llama/Llama-3.1-8B-Instruct
+    commit: TBD-COMMIT-SHA
+
+toolchain:
+  vllm_version: TBD                  # e.g. 0.6.x
+  tokenskip_commit: TBD-COMMIT-SHA   # upstream commit the vendored TokenSkip/ derives from
+  # LLMLingua-2 compressor (Phase 2). TokenSkip's exact checkpoint; SHA verified on
+  # the server/tokenskip_env 2026-06-01. Also pinned in code (tsmc.compression.llmlingua)
+  # so the pin reaches the server even though this file is gitignored.
+  llmlingua2_checkpoint: microsoft/llmlingua-2-xlm-roberta-large-meetingbank
+  llmlingua2_checkpoint_hash: ebaba9b0e874dadd3003ffcff828e4397e568089
+  llamafactory_commit: TBD-COMMIT-SHA
+
+mceval:
+  # Pull by sha256 DIGEST, never a floating tag (docs/WORKFLOW.md s3).
+  docker_image: multilingualnlp/mceval
+  docker_digest: sha256:TBD
+
+contract:
+  sentinel: "@@@FINAL_CODE_7F3A9@@@"  # must match src/tsmc/constants.py SENTINEL
+  gamma_grid: [1.0, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
+  # gamma-marker delimiter is PER MODEL FAMILY (tsmc.contract.prompt GAMMA_DELIMITERS):
+  #   qwen   -> "<|eot_id|>"          (literal text for the Qwen tokenizer)
+  #   llama3 -> "@@@GAMMA_7F3A9@@@"   (Llama-safe; <|eot_id|> is a real Llama special token)
+  # So the Llama run has a DIFFERENT prompt_template_hash than the Qwen runs (the
+  # Qwen hash is unchanged -- Qwen prompts render byte-identically to before).
+  prompt_template_hash: TBD           # hash over the frozen prompt template(s) for THIS model's family
+
+energy:
+  # Energy-instrumented sweep config (Phase 4). Energy is measured per (model x gamma
+  # x task x split) RUN; the monitors wrap INFERENCE ONLY (McEval Docker scoring runs
+  # later with the monitors stopped) and join_energy integrates the generate window.
+  gpu_index: 0          # physical nvidia-smi index of the dedicated GPU (== CUDA_VISIBLE_DEVICES)
+  sample_interval_s: 0.5
+  pdu_host: "192.0.2.1"                              # rack PDU SNMP host
+  snmp_community: "public"
+  snmp_oid: "PowerNet-MIB::ePDUPhaseStatusActivePower.1"  # active-power OID

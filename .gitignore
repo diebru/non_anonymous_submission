@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.ipynb_checkpoints/
+
+# Bulk, regenerated artifacts (never committed)
+outputs/
+output/
+Modelli_Fusi/
+generations/
+corpus/
+compressed/
+weights/
+eval_dumps/
+lora_saves/
+
+# Model / tokenizer weights
+*.safetensors
+*.bin
+*.pth
+*.onnx
+
+# Logs
+*.log
+
+# Local / secret config
+.env
+.env.*
+*.local
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

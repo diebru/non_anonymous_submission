@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tsmc"
+version = "0.0.0"
+description = "TokenSkip x McEval: controllable CoT compression on multilingual code generation"
+readme = "README.md"
+requires-python = ">=3.10"
+# Keep the base package import-light. Heavy, server-only stacks (vllm, torch,
+# llmlingua, llamafactory) are NOT listed here: they are installed into the
+# conda envs on the server (tokenskip_env, llamafactory_env). This lets the
+# CPU-only modules (config, constants, manifest, schema, parsers) be imported
+# and tested locally without GPU dependencies. See docs/WORKFLOW.md.
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tsmc = ["py.typed"]
