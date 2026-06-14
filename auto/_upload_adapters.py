@@ -47,7 +47,8 @@ def main():
     ap.add_argument("--dry-run", type=int, default=0)
     a = ap.parse_args()
 
-    api = HfApi()
+    token = os.environ.get("HF_TOKEN") or None
+    api = HfApi(token=token)
     for size in a.sizes.split():
         if size not in SIZE_DIRS:
             print(f"!! unknown size {size}, skip"); continue
@@ -65,7 +66,7 @@ def main():
             if a.dry_run:
                 continue
             upload_folder(
-                repo_id=repo_id, repo_type="model",
+                repo_id=repo_id, repo_type="model", token=token,
                 folder_path=src, path_in_repo=bench,
                 allow_patterns=ALLOW, ignore_patterns=IGNORE,
                 commit_message=f"add {bench} TokenSkip LoRA adapter",

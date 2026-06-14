@@ -7,8 +7,9 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 : "${HF_TOKEN:?set HF_TOKEN in config.env}"
 : "${LORA_SAVES_DIR:?}" ; : "${MCEVAL_WEIGHTS_DIR:?}"
 
-run "conda run -n $TS_ENV pip install -q -U 'huggingface_hub[cli]'"
-run "conda run -n $TS_ENV huggingface-cli login --token '$HF_TOKEN' --add-to-git-credential"
+# huggingface_hub>=1.x: the library reads HF_TOKEN from the env (exported by lib.sh);
+# no CLI login needed. (The old `huggingface-cli` is removed in favor of `hf`.)
+run "conda run -n $TS_ENV pip install -q -U 'huggingface_hub'"
 
 log "Previewing what would upload (dry-run):"
 run "conda run -n $TS_ENV python '$AUTO_DIR/_upload_adapters.py' \

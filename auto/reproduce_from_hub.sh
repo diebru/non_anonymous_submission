@@ -10,7 +10,7 @@ PREFIX="${HF_REPO_PREFIX:-tokenskip}"
 ADAPTERS_DIR="$DATA_ROOT/hub_adapters"
 REASONING_BENCHES="gsm8k math boolq piqa"
 
-[[ -n "${HF_TOKEN:-}" ]] && run "conda run -n $TS_ENV huggingface-cli login --token '$HF_TOKEN' --add-to-git-credential" || true
+# HF_TOKEN is read from the env by huggingface_hub / the `hf` CLI (exported in lib.sh).
 
 for size in ${PUBLISH_SIZES:-3b 7b 14b}; do
   model_spec "qwen2.5-$size" || continue
@@ -23,7 +23,7 @@ for size in ${PUBLISH_SIZES:-3b 7b 14b}; do
     ADAPTER="$DLROOT/$BENCH"
     if [[ ! -f "$ADAPTER/adapter_config.json" ]]; then
       log "download adapter $REPO :: $BENCH"
-      run "conda run -n $TS_ENV huggingface-cli download '$REPO' --include '${BENCH}/*' --local-dir '$DLROOT'"
+      run "conda run -n $TS_ENV hf download '$REPO' --include '${BENCH}/*' --local-dir '$DLROOT'"
     fi
 
     log "measured sweep [1 GPU, base+adapter] qwen2.5-$size / $BENCH"
@@ -51,7 +51,7 @@ done
 cat <<EOF
 
 [mceval fast-repro] adapters are also on the Hub under each repo's mceval/ subfolder. To run:
-  conda run -n $TS_ENV huggingface-cli download $HF_NAMESPACE/${PREFIX}-qwen2.5-7b --include 'mceval/*' --local-dir $ADAPTERS_DIR/qwen2.5-7b
+  conda run -n $TS_ENV hf download $HF_NAMESPACE/${PREFIX}-qwen2.5-7b --include 'mceval/*' --local-dir $ADAPTERS_DIR/qwen2.5-7b
   # merge (peft) then point the mceval energy sweep at the merged dir:
   conda run -n $TS_ENV python mceval/scripts/merge_lora.py --base Qwen/Qwen2.5-7B-Instruct \\
       --adapter $ADAPTERS_DIR/qwen2.5-7b/mceval --output $DATA_ROOT/merged/qwen2.5-7b-mceval

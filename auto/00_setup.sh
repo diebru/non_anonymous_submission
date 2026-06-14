@@ -19,7 +19,7 @@ if ! have_conda_env "$TS_ENV"; then
 fi
 log "Installing reasoning-arm deps into $TS_ENV"
 run "conda run -n $TS_ENV pip install -r '$REPO_ROOT/common/requirements.txt'"
-run "conda run -n $TS_ENV pip install -U 'huggingface_hub[cli]'"
+run "conda run -n $TS_ENV pip install -U 'huggingface_hub'"
 
 # --- conda env: llamafactory_env + LLaMA-Factory -------------------------
 if ! have_conda_env "$LF_ENV"; then
@@ -35,13 +35,13 @@ run "conda run -n $LF_ENV pip install -e '$REPO_ROOT/LlamaFactory[torch,metrics]
 
 # --- download the 4 base models at PINNED commits ------------------------
 mkdir -p "$MODELS_DIR" "$DATA_ROOT" "$HF_HOME"
-[[ -n "${HF_TOKEN:-}" ]] && run "conda run -n $TS_ENV huggingface-cli login --token '$HF_TOKEN' --add-to-git-credential" || warn "HF_TOKEN empty; gated Llama download may fail"
+[[ -n "${HF_TOKEN:-}" ]] || warn "HF_TOKEN empty; gated Llama download may fail"
 for key in $MODELS_TO_RUN; do
   model_spec "$key" || continue
   if [[ -z "$MREV" || "$MREV" == PUT_* ]]; then warn "$key: commit SHA not set in config.env — skipping download"; continue; fi
   if [[ -f "$LOCAL_MODEL/config.json" ]]; then log "$key already downloaded at $LOCAL_MODEL"; continue; fi
   log "Downloading $HF_REPO @ $MREV -> $LOCAL_MODEL"
-  run "conda run -n $TS_ENV huggingface-cli download '$HF_REPO' --revision '$MREV' --local-dir '$LOCAL_MODEL'"
+  run "conda run -n $TS_ENV hf download '$HF_REPO' --revision '$MREV' --local-dir '$LOCAL_MODEL'"
 done
 
 # --- McEval Docker image by digest ---------------------------------------
