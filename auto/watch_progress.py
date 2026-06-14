@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """Live progress of a running reproduce_from_hub sweep (read-only; safe mid-run).
 
-Scans <repo>/*/outputs_hubrepro for completed runs and prints, per (model,bench,ratio):
-  runs done / expected, mean accuracy, mean CoT, mean GPU energy.
-Plus a live nvidia-smi power line and overall progress.
+Shows, per (model,bench,ratio): runs done/expected, mean accuracy, mean CoT, mean GPU
+energy, mean PDU energy. Plus a live nvidia-smi power line and a live PDU power reading.
 
 Run in a 2nd terminal:
   source config.env && python3 watch_progress.py            # one snapshot
   source config.env && python3 watch_progress.py --loop 30  # refresh every 30s
-Expected totals come from the SWEEP_*/PUBLISH_SIZES/BENCHMARKS_TO_RUN env vars
-(so `source config.env` first); without them it just shows what's done.
+`source config.env` first so the expected totals and the PDU SNMP settings are in env.
 """
 import argparse, glob, json, os, subprocess, time
 from collections import defaultdict
@@ -39,21 +37,39 @@ def gpu_now():
         return "nvidia-smi n/a"
 
 
+def pdu_now():
+    if os.environ.get("ENABLE_PDU", "1") != "1":
+        return "PDU off"
+    host = os.environ.get("PDU_HOST") or os.environ.get("PDU_IP") or "192.0.2.1"
+    comm = os.environ.get("PDU_SNMP_COMMUNITY", "public")
+    oid = os.environ.get("PDU_OID", "PowerNet-MIB::ePDUPhaseStatusActivePower.1")
+    try:
+        out = subprocess.run(["snmpget", "-v2c", "-c", comm, host, oid],
+                             capture_output=True, text=True, timeout=5)
+        import re
+        m = re.search(r"(-?\d+(?:\.\d+)?)", out.stdout.split("=", 1)[1]) if "=" in out.stdout else None
+        return f"PDU {float(m.group(1)):.0f}W" if m else f"PDU n/a ({out.stderr.strip()[:40]})"
+    except Exception as e:
+        return f"PDU err ({e})"
+
+
 def snapshot(repo_root):
     grp = defaultdict(list)
     for m in glob.glob(os.path.join(repo_root, "*", "outputs_hubrepro", "**", "metrics.json"), recursive=True):
         try:
             md = json.load(open(m))
         except Exception:
-            continue                                   # being written right now
+            continue
         parts = m.split(os.sep); i = parts.index("outputs_hubrepro")
         size = parts[i + 1].split("-")[-1]; bench = parts[i + 2]
         ratio = 1.0 if "Original" in m else float(m.split("TokenSkip" + os.sep)[1].split(os.sep)[0])
         run_dir = m.split(os.sep + ("Original" if ratio == 1.0 else "TokenSkip"))[0]
         run = next((p[3:] for p in parts if p.startswith("run")), "1")
         g = glob.glob(os.path.join(run_dir, f"*ratio{ratio}_run{run}_gpu.json"))
+        p = glob.glob(os.path.join(run_dir, f"*ratio{ratio}_run{run}_pdu.json"))
         grp[(size, bench, ratio)].append((md.get("accuracy"), md.get("avg_cot_length"),
-                                          energy_j(g[0]) if g else None))
+                                          energy_j(g[0]) if g else None,
+                                          energy_j(p[0]) if p else None))
     return grp
 
 
@@ -74,17 +90,19 @@ def main():
         done = sum(len(v) for v in grp.values())
         if os.environ.get("CLEAR") != "0":
             print("\033[2J\033[H", end="")
-        print(f"[{datetime.now():%H:%M:%S}] {gpu_now()}")
+        print(f"[{datetime.now():%H:%M:%S}] {gpu_now()}  ||  {pdu_now()}")
         print(f"completed runs: {done}   (expected {exp}/cell)\n")
-        print(f"{'model':<8} {'bench':<7} {'gamma':>5} {'done':>6} {'acc':>8} {'cot':>7} {'gpuJ':>9}")
+        print(f"{'model':<8} {'bench':<7} {'gamma':>5} {'done':>6} {'acc':>8} {'cot':>7} {'gpuJ':>9} {'pduJ':>9}")
         for (size, bench, ratio), runs in sorted(grp.items()):
-            accs = [a for a, _, _ in runs if a is not None]
-            cots = [c for _, c, _ in runs if c is not None]
-            gj = [e for _, _, e in runs if e is not None]
+            accs = [x[0] for x in runs if x[0] is not None]
+            cots = [x[1] for x in runs if x[1] is not None]
+            gj = [x[2] for x in runs if x[2] is not None]
+            pj = [x[3] for x in runs if x[3] is not None]
             acc = f"{sum(accs)/len(accs)*100:.2f}%" if accs else "-"
             cot = f"{sum(cots)/len(cots):.1f}" if cots else "-"
             g = f"{sum(gj)/len(gj):.0f}" if gj else "-"
-            print(f"{size:<8} {bench:<7} {ratio:>5} {len(runs):>3}/{exp:<2} {acc:>8} {cot:>7} {g:>9}")
+            p = f"{sum(pj)/len(pj):.0f}" if pj else "-"
+            print(f"{size:<8} {bench:<7} {ratio:>5} {len(runs):>3}/{exp:<2} {acc:>8} {cot:>7} {g:>9} {p:>9}")
         if a.loop <= 0:
             break
         time.sleep(a.loop)
