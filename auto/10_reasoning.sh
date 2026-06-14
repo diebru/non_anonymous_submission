@@ -121,12 +121,13 @@ measured_sweep() { # 1 GPU ONLY + GPU/PDU monitors
         PDU_PID=""
         [[ "${ENABLE_PDU:-1}" == "1" ]] && { python3 "$REPO_ROOT/common/monitor_pdu.py" --run-name "$rid" --output-dir "$base" --interval "$MONITOR_INTERVAL" & PDU_PID=$!; }
         # SINGLE-GPU measured inference (merged model; ratio marker injected by --compression_ratio)
-        CUDA_VISIBLE_DEVICES=0 conda run -n "$TS_ENV" python "$REPO_ROOT/common/evaluation.py" \
+        # run from the benchmark folder so evaluation.py finds configs/ and datasets/ (relative paths)
+        ( cd "$REPO_ROOT/$BENCH" && CUDA_VISIBLE_DEVICES=0 conda run -n "$TS_ENV" python "$REPO_ROOT/common/evaluation.py" \
             --output-dir "$base" --model-path "$MERGED" --tokenizer-path "$MERGED" \
             --model-size "$MSIZE" --model-type "$MTYPE" --data-type test \
             --max_new_tokens "$T" --eval_batch_size "$EVAL_BATCH_SIZE" \
             --temperature "$TEMPERATURE" --seed "$SEED" --benchmark "$BENCH" \
-            --use_vllm --compression_ratio "$r"
+            --use_vllm --compression_ratio "$r" )
         kill -2 "$GPU_PID" 2>/dev/null || true
         [[ -n "$PDU_PID" ]] && { kill -2 "$PDU_PID" 2>/dev/null || true; }
         sleep 10

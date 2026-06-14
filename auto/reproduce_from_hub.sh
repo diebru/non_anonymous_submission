@@ -35,12 +35,13 @@ for size in ${PUBLISH_SIZES:-3b 7b 14b}; do
       python3 "$REPO_ROOT/common/monitor_gpu.py" --run-name "$rid" --output-dir "$base" --interval "$MONITOR_INTERVAL" & GPU_PID=$!
       PDU_PID=""
       [[ "${ENABLE_PDU:-1}" == "1" ]] && { python3 "$REPO_ROOT/common/monitor_pdu.py" --run-name "$rid" --output-dir "$base" --interval "$MONITOR_INTERVAL" & PDU_PID=$!; }
-      CUDA_VISIBLE_DEVICES=0 conda run -n "$TS_ENV" python "$REPO_ROOT/common/evaluation.py" \
+      # run from the benchmark folder so evaluation.py finds configs/ and datasets/ (paths are relative)
+      ( cd "$REPO_ROOT/$BENCH" && CUDA_VISIBLE_DEVICES=0 conda run -n "$TS_ENV" python "$REPO_ROOT/common/evaluation.py" \
           --output-dir "$base" --model-path "$BASE" --tokenizer-path "$BASE" \
           --model-size "$MSIZE" --model-type "$MTYPE" --data-type test \
           --max_new_tokens "$T" --eval_batch_size "$EVAL_BATCH_SIZE" \
           --temperature "$TEMPERATURE" --seed "$SEED" --benchmark "$BENCH" \
-          --use_vllm --compression_ratio "$r" --use_adapter --adapter-path "$ADAPTER"
+          --use_vllm --compression_ratio "$r" --use_adapter --adapter-path "$ADAPTER" )
       kill -2 "$GPU_PID" 2>/dev/null || true
       [[ -n "$PDU_PID" ]] && { kill -2 "$PDU_PID" 2>/dev/null || true; }
       sleep 10
