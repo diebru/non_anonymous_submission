@@ -31,7 +31,11 @@ for size in ${PUBLISH_SIZES:-3b 7b 14b}; do
       base="$REPO_ROOT/$BENCH/outputs_hubrepro/qwen2.5-${size}/$BENCH/tok${T}/run${k}"
       rid="${size}_${BENCH}_tok${T}_ratio${r}_run${k}"
       run "mkdir -p '$base'"
-      [[ "${DRY_RUN:-0}" == "1" ]] && { echo "  + [eval] CUDA_VISIBLE_DEVICES=0 base+adapter ratio=$r tok=$T -> $base"; continue; }
+      # gamma=1.0 is the UNCOMPRESSED baseline = pristine base model (the compression
+      # adapter collapses to ~0 CoT when given no gamma marker). gamma<1.0 = base+adapter.
+      ADAPTER_ARGS="--use_adapter --adapter-path $ADAPTER"
+      [[ "$r" == "1.0" ]] && ADAPTER_ARGS=""
+      [[ "${DRY_RUN:-0}" == "1" ]] && { echo "  + [eval] CUDA_VISIBLE_DEVICES=0 ratio=$r tok=$T adapter='${ADAPTER_ARGS:-<none/base>}' -> $base"; continue; }
       python3 "$REPO_ROOT/common/monitor_gpu.py" --run-name "$rid" --output-dir "$base" --interval "$MONITOR_INTERVAL" & GPU_PID=$!
       PDU_PID=""
       [[ "${ENABLE_PDU:-1}" == "1" ]] && { python3 "$REPO_ROOT/common/monitor_pdu.py" --run-name "$rid" --output-dir "$base" --interval "$MONITOR_INTERVAL" & PDU_PID=$!; }
@@ -41,7 +45,7 @@ for size in ${PUBLISH_SIZES:-3b 7b 14b}; do
           --model-size "$MSIZE" --model-type "$MTYPE" --data-type test \
           --max_new_tokens "$T" --eval_batch_size "$EVAL_BATCH_SIZE" \
           --temperature "$TEMPERATURE" --seed "$SEED" --benchmark "$BENCH" \
-          --use_vllm --compression_ratio "$r" --use_adapter --adapter-path "$ADAPTER" )
+          --use_vllm --compression_ratio "$r" $ADAPTER_ARGS )
       kill -2 "$GPU_PID" 2>/dev/null || true
       [[ -n "$PDU_PID" ]] && { kill -2 "$PDU_PID" 2>/dev/null || true; }
       sleep 10

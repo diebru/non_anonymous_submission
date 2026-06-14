@@ -120,10 +120,14 @@ measured_sweep() { # 1 GPU ONLY + GPU/PDU monitors
         python3 "$REPO_ROOT/common/monitor_gpu.py" --run-name "$rid" --output-dir "$base" --interval "$MONITOR_INTERVAL" & GPU_PID=$!
         PDU_PID=""
         [[ "${ENABLE_PDU:-1}" == "1" ]] && { python3 "$REPO_ROOT/common/monitor_pdu.py" --run-name "$rid" --output-dir "$base" --interval "$MONITOR_INTERVAL" & PDU_PID=$!; }
-        # SINGLE-GPU measured inference (merged model; ratio marker injected by --compression_ratio)
+        # gamma=1.0 = uncompressed baseline -> pristine BASE model (the merged/SFT model
+        # collapses to ~0 CoT without a gamma marker). gamma<1.0 -> merged compression model.
+        EVAL_MODEL="$MERGED"
+        [[ "$r" == "1.0" ]] && EVAL_MODEL="$LOCAL_MODEL"
+        # SINGLE-GPU measured inference; ratio marker injected by --compression_ratio.
         # run from the benchmark folder so evaluation.py finds configs/ and datasets/ (relative paths)
         ( cd "$REPO_ROOT/$BENCH" && CUDA_VISIBLE_DEVICES=0 conda run -n "$TS_ENV" python "$REPO_ROOT/common/evaluation.py" \
-            --output-dir "$base" --model-path "$MERGED" --tokenizer-path "$MERGED" \
+            --output-dir "$base" --model-path "$EVAL_MODEL" --tokenizer-path "$EVAL_MODEL" \
             --model-size "$MSIZE" --model-type "$MTYPE" --data-type test \
             --max_new_tokens "$T" --eval_batch_size "$EVAL_BATCH_SIZE" \
             --temperature "$TEMPERATURE" --seed "$SEED" --benchmark "$BENCH" \
