@@ -66,13 +66,14 @@ def main():
         size = model_dir.split("-")[-1]
         bench = parts[i + 2]
         tok = next((p[3:] for p in parts if p.startswith("tok")), None)
-        run = next((p[3:] for p in parts if re.fullmatch(r"run\d+", p)), "1")
+        ri = next((j for j, p in enumerate(parts) if re.fullmatch(r"run\d+", p)), None)
+        run = parts[ri][3:] if ri is not None else "1"
         if a.token and tok != str(a.token):
             continue
         ratio = 1.0 if "Original" in m else float(m.split("TokenSkip" + os.sep)[1].split(os.sep)[0])
 
         md = json.load(open(m))
-        run_dir = m.split(os.sep + ("Original" if ratio == 1.0 else "TokenSkip"))[0]
+        run_dir = os.sep.join(parts[:ri + 1]) if ri is not None else os.path.dirname(m)  # holds *_gpu/_pdu.json
         rec = {
             "n": md.get("n_samples") or 0,
             "acc": md.get("accuracy"),

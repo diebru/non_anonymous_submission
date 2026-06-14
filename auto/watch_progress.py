@@ -63,8 +63,9 @@ def snapshot(repo_root):
         parts = m.split(os.sep); i = parts.index("outputs_hubrepro")
         size = parts[i + 1].split("-")[-1]; bench = parts[i + 2]
         ratio = 1.0 if "Original" in m else float(m.split("TokenSkip" + os.sep)[1].split(os.sep)[0])
-        run_dir = m.split(os.sep + ("Original" if ratio == 1.0 else "TokenSkip"))[0]
-        run = next((p[3:] for p in parts if p.startswith("run")), "1")
+        ri = next((j for j, p in enumerate(parts) if p.startswith("run") and p[3:].isdigit()), None)
+        run_dir = os.sep.join(parts[:ri + 1]) if ri is not None else os.path.dirname(m)  # holds *_gpu/_pdu.json
+        run = parts[ri][3:] if ri is not None else "1"
         g = glob.glob(os.path.join(run_dir, f"*ratio{ratio}_run{run}_gpu.json"))
         p = glob.glob(os.path.join(run_dir, f"*ratio{ratio}_run{run}_pdu.json"))
         grp[(size, bench, ratio)].append((md.get("accuracy"), md.get("avg_cot_length"),
