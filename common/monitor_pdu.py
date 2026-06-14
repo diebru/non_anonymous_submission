@@ -24,8 +24,13 @@ class PDUMonitor:
     def get_pdu_stats(self):
         """Get all available PDU statistics using SNMP."""
         try:
-            cmd = ['snmpget', '-v2c', '-c', 'public', '192.0.2.1', 
-                   'PowerNet-MIB::ePDUPhaseStatusActivePower.1']
+            # Host / community / OID come from the environment (set in auto/config.env),
+            # falling back to the committed placeholders. Use a NUMERIC OID via PDU_OID if
+            # the vendor PowerNet-MIB isn't installed on this box.
+            host = os.environ.get('PDU_HOST') or os.environ.get('PDU_IP') or '192.0.2.1'
+            community = os.environ.get('PDU_SNMP_COMMUNITY', 'public')
+            oid = os.environ.get('PDU_OID', 'PowerNet-MIB::ePDUPhaseStatusActivePower.1')
+            cmd = ['snmpget', '-v2c', '-c', community, host, oid]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             
             if result.returncode != 0:
@@ -39,9 +44,14 @@ class PDUMonitor:
                 print("[PDU] Empty SNMP response", file=sys.stderr)
                 return None
                 
-            # Parse response: "PowerNet-MIB::ePDUPhaseStatusActivePower.1 = INTEGER: 73"
-            value_str = response.split('=')[1].strip()
-            power_value = float(value_str.replace('INTEGER:', '').strip())
+            # Parse the value after '=', tolerating any SNMP type (INTEGER/Gauge32/...)
+            # e.g. "... = INTEGER: 73"  or  "... = Gauge32: 73"
+            import re
+            mnum = re.search(r'(-?\d+(?:\.\d+)?)', response.split('=', 1)[1])
+            if not mnum:
+                print(f"[PDU] Could not parse value from: {response}", file=sys.stderr)
+                return None
+            power_value = float(mnum.group(1))
             
             pdu_info = {
                 'timestamp': datetime.now().isoformat(),
