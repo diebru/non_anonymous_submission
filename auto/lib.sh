@@ -33,6 +33,20 @@ _MODEL_ROWS=(
   "llama3.1-8b|LLaMA-3.1-8B-Instruct|8b|llama3|meta-llama/Llama-3.1-8B-Instruct|LLAMA8B_SHA|llama3.1|llama3|llama"
 )
 
+# Per-benchmark BASE max_new_tokens (evaluation.py scales it by gamma for gamma<1.0).
+# Reference budgets: gsm8k 512, math 1024, boolq 1024, piqa 512, mceval 1024.
+# Override per bench via TOK_<BENCH> env vars in config.env.
+bench_tokens() {
+  case "$1" in
+    gsm8k)  echo "${TOK_GSM8K:-512}";;
+    math)   echo "${TOK_MATH:-1024}";;
+    boolq)  echo "${TOK_BOOLQ:-1024}";;
+    piqa)   echo "${TOK_PIQA:-512}";;
+    mceval) echo "${TOK_MCEVAL:-1024}";;
+    *)      echo "${SWEEP_TOKENS:-512}";;
+  esac
+}
+
 # Populate MF/MSIZE/... globals for a model key. Returns nonzero if unknown.
 model_spec() {
   local key="$1" row

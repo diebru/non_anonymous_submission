@@ -37,8 +37,9 @@ for size in ${PUBLISH_SIZES:-3b 7b 14b}; do
       run "conda run -n $TS_ENV python '$REPO_ROOT/common/merge.py' --base '$BASE' --adapter '$ADAPTER' --output '$MERGED'"
     fi
 
-    log "measured sweep [1 GPU] qwen2.5-$size / $BENCH  (gamma=1.0 base, gamma<1.0 merged)"
-    for T in $SWEEP_TOKENS; do for r in $SWEEP_RATIOS; do for k in $(seq 1 "$SWEEP_REPEATS"); do
+    T="$(bench_tokens "$BENCH")"     # per-benchmark base budget; evaluation.py scales by gamma
+    log "measured sweep [1 GPU] qwen2.5-$size / $BENCH  (max_new_tokens=$T, gamma=1.0 base, gamma<1.0 merged)"
+    for r in $SWEEP_RATIOS; do for k in $(seq 1 "$SWEEP_REPEATS"); do
       base="$REPO_ROOT/$BENCH/outputs_hubrepro/qwen2.5-${size}/$BENCH/tok${T}/run${k}"
       rid="${size}_${BENCH}_tok${T}_ratio${r}_run${k}"
       run "mkdir -p '$base'"
@@ -58,7 +59,7 @@ for size in ${PUBLISH_SIZES:-3b 7b 14b}; do
       kill -2 "$GPU_PID" 2>/dev/null || true
       [[ -n "$PDU_PID" ]] && { kill -2 "$PDU_PID" 2>/dev/null || true; }
       sleep 10
-    done; done; done
+    done; done
   done
 done
 

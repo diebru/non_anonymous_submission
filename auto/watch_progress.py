@@ -75,9 +75,8 @@ def snapshot(repo_root):
 
 
 def expected_per_cell():
-    toks = len((os.environ.get("SWEEP_TOKENS") or "").split()) or 1
-    reps = int(os.environ.get("SWEEP_REPEATS") or 1)
-    return toks * reps
+    # one base-token budget per benchmark now -> expected runs/cell = repeats
+    return int(os.environ.get("SWEEP_REPEATS") or 1)
 
 
 def main():

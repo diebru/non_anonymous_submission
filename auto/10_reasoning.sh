@@ -106,9 +106,9 @@ merge_adapter() { # peft, tokenskip_env
 }
 
 measured_sweep() { # 1 GPU ONLY + GPU/PDU monitors
-  log "measured sweep [1 GPU] $MF/$BENCH  (tokens={$SWEEP_TOKENS} ratios={$SWEEP_RATIOS} x$SWEEP_REPEATS)"
   local T r k base rid
-  for T in $SWEEP_TOKENS; do
+  T="$(bench_tokens "$BENCH")"     # per-benchmark base budget; evaluation.py scales by gamma
+  log "measured sweep [1 GPU] $MF/$BENCH  (max_new_tokens=$T ratios={$SWEEP_RATIOS} x$SWEEP_REPEATS)"
     for r in $SWEEP_RATIOS; do
       for k in $(seq 1 "$SWEEP_REPEATS"); do
         base="$REPO_ROOT/$BENCH/outputs_sweep/$MF/$BENCH/tok${T}/run${k}"
@@ -137,7 +137,6 @@ measured_sweep() { # 1 GPU ONLY + GPU/PDU monitors
         sleep 10
       done
     done
-  done
 }
 
 for key in $MODELS_TO_RUN; do
