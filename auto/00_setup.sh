@@ -41,7 +41,7 @@ for key in $MODELS_TO_RUN; do
   if [[ -z "$MREV" || "$MREV" == PUT_* ]]; then warn "$key: commit SHA not set in config.env — skipping download"; continue; fi
   if [[ -f "$LOCAL_MODEL/config.json" ]]; then log "$key already downloaded at $LOCAL_MODEL"; continue; fi
   log "Downloading $HF_REPO @ $MREV -> $LOCAL_MODEL"
-  run "conda run -n $TS_ENV hf download '$HF_REPO' --revision '$MREV' --local-dir '$LOCAL_MODEL'"
+  run "conda run -n $TS_ENV python '$AUTO_DIR/_hf_download.py' '$HF_REPO' '$LOCAL_MODEL' --revision '$MREV'"
 done
 
 # --- McEval Docker image by digest ---------------------------------------
