@@ -26,26 +26,35 @@ for size in ${PUBLISH_SIZES:-3b 7b 14b}; do
       run "conda run -n $TS_ENV python '$AUTO_DIR/_hf_download.py' '$REPO' '$DLROOT' --include '${BENCH}/*'"
     fi
 
-    log "measured sweep [1 GPU, base+adapter] qwen2.5-$size / $BENCH"
+    # Energy-correct methodology (validated against the reference): gamma<1.0 runs the
+    # MERGED model (base+adapter merged via peft -> no vLLM LoRARequest runtime overhead),
+    # gamma=1.0 runs the pristine BASE model (the compression model collapses to ~0 CoT
+    # without a gamma marker). base+adapter via LoRARequest reproduced ACCURACY but inflated
+    # energy ~70% and washed out the per-gamma trend.
+    MERGED="$DATA_ROOT/merged/qwen2.5-${size}-${BENCH}"
+    if [[ ! -f "$MERGED/config.json" ]]; then
+      log "merge adapter -> $MERGED (peft)"
+      run "conda run -n $TS_ENV python '$REPO_ROOT/common/merge.py' --base '$BASE' --adapter '$ADAPTER' --output '$MERGED'"
+    fi
+
+    log "measured sweep [1 GPU] qwen2.5-$size / $BENCH  (gamma=1.0 base, gamma<1.0 merged)"
     for T in $SWEEP_TOKENS; do for r in $SWEEP_RATIOS; do for k in $(seq 1 "$SWEEP_REPEATS"); do
       base="$REPO_ROOT/$BENCH/outputs_hubrepro/qwen2.5-${size}/$BENCH/tok${T}/run${k}"
       rid="${size}_${BENCH}_tok${T}_ratio${r}_run${k}"
       run "mkdir -p '$base'"
-      # gamma=1.0 is the UNCOMPRESSED baseline = pristine base model (the compression
-      # adapter collapses to ~0 CoT when given no gamma marker). gamma<1.0 = base+adapter.
-      ADAPTER_ARGS="--use_adapter --adapter-path $ADAPTER"
-      [[ "$r" == "1.0" ]] && ADAPTER_ARGS=""
-      [[ "${DRY_RUN:-0}" == "1" ]] && { echo "  + [eval] CUDA_VISIBLE_DEVICES=0 ratio=$r tok=$T adapter='${ADAPTER_ARGS:-<none/base>}' -> $base"; continue; }
+      EVAL_MODEL="$MERGED"
+      [[ "$r" == "1.0" ]] && EVAL_MODEL="$BASE"
+      [[ "${DRY_RUN:-0}" == "1" ]] && { echo "  + [eval] CUDA_VISIBLE_DEVICES=0 ratio=$r tok=$T model=$EVAL_MODEL -> $base"; continue; }
       python3 "$REPO_ROOT/common/monitor_gpu.py" --run-name "$rid" --output-dir "$base" --interval "$MONITOR_INTERVAL" & GPU_PID=$!
       PDU_PID=""
       [[ "${ENABLE_PDU:-1}" == "1" ]] && { python3 "$REPO_ROOT/common/monitor_pdu.py" --run-name "$rid" --output-dir "$base" --interval "$MONITOR_INTERVAL" & PDU_PID=$!; }
       # run from the benchmark folder so evaluation.py finds configs/ and datasets/ (paths are relative)
       ( cd "$REPO_ROOT/$BENCH" && CUDA_VISIBLE_DEVICES=0 conda run -n "$TS_ENV" python "$REPO_ROOT/common/evaluation.py" \
-          --output-dir "$base" --model-path "$BASE" --tokenizer-path "$BASE" \
+          --output-dir "$base" --model-path "$EVAL_MODEL" --tokenizer-path "$EVAL_MODEL" \
           --model-size "$MSIZE" --model-type "$MTYPE" --data-type test \
           --max_new_tokens "$T" --eval_batch_size "$EVAL_BATCH_SIZE" \
           --temperature "$TEMPERATURE" --seed "$SEED" --benchmark "$BENCH" \
-          --use_vllm --compression_ratio "$r" $ADAPTER_ARGS )
+          --use_vllm --compression_ratio "$r" )
       kill -2 "$GPU_PID" 2>/dev/null || true
       [[ -n "$PDU_PID" ]] && { kill -2 "$PDU_PID" 2>/dev/null || true; }
       sleep 10
