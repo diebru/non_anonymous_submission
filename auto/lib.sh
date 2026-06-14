@@ -8,8 +8,12 @@ if [[ ! -f "$AUTO_DIR/config.env" ]]; then
   echo "ERROR: $AUTO_DIR/config.env not found. Run: cp config.env.example config.env  (then edit it)" >&2
   exit 1
 fi
+# An inline override (e.g. `DRY_RUN=1 bash 10_reasoning.sh`) must survive config.env,
+# which sets a default DRY_RUN. Capture it before sourcing, restore it after.
+__DRYRUN_ENV="${DRY_RUN-__unset__}"
 # shellcheck disable=SC1090
 source "$AUTO_DIR/config.env"
+[[ "$__DRYRUN_ENV" != "__unset__" ]] && DRY_RUN="$__DRYRUN_ENV"
 
 : "${REPO_ROOT:?set in config.env}"
 : "${DATA_ROOT:?}" ; : "${HF_HOME:?}" ; : "${MODELS_DIR:?}"
